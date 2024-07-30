@@ -58,5 +58,5 @@ This repository contains an example pipeline that demonstrates the INVALID_ARGUM
   gradle run
   ```
 
-- Check the Job in the Dataflow Job service.
+- Check jobs in the Dataflow Job service on Google Cloud Platform.
 - Publish messages to the topic for the job to process and see the results. (According to the results running in our environment, the error will appear after 15 minutes, with ~7k messages, throughput ~7 elements/s)
