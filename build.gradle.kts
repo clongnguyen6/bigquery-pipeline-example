@@ -20,6 +20,8 @@ dependencies {
     implementation("org.apache.beam:beam-runners-google-cloud-dataflow-java:2.57.0")
     implementation("org.apache.beam:beam-sdks-java-extensions-join-library:2.57.0")
 
+    implementation("com.google.cloud:google-cloud-bigquery:2.40.1")
+
     testImplementation(kotlin("test"))
 }
 
@@ -33,4 +35,10 @@ kotlin {
 
 application {
     mainClass.set("MainKt")
+}
+
+tasks {
+    "run"(JavaExec::class) {
+        environment("GOOGLE_APPLICATION_CREDENTIALS", "/service-account.json")
+    }
 }

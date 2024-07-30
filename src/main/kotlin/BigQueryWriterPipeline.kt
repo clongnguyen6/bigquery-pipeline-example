@@ -2,12 +2,11 @@ import com.google.api.services.bigquery.model.TableFieldSchema
 import com.google.api.services.bigquery.model.TableReference
 import com.google.api.services.bigquery.model.TableRow
 import com.google.api.services.bigquery.model.TableSchema
-import com.google.auth.Credentials
-import com.google.auth.oauth2.ServiceAccountCredentials
 import org.apache.beam.runners.dataflow.DataflowRunner
 import org.apache.beam.runners.dataflow.options.DataflowPipelineOptions
 import org.apache.beam.runners.dataflow.options.DataflowPipelineWorkerPoolOptions
 import org.apache.beam.sdk.Pipeline
+import org.apache.beam.sdk.extensions.gcp.options.GcpOptions
 import org.apache.beam.sdk.io.gcp.bigquery.BigQueryIO
 import org.apache.beam.sdk.io.gcp.bigquery.DynamicDestinations
 import org.apache.beam.sdk.io.gcp.bigquery.InsertRetryPolicy
@@ -25,7 +24,6 @@ import org.apache.beam.sdk.values.TupleTag
 import org.apache.beam.sdk.values.TupleTagList
 import org.apache.beam.sdk.values.ValueInSingleWindow
 import org.joda.time.Duration
-import java.io.FileInputStream
 import kotlin.random.Random
 
 class BigQueryWriterPipeline {
@@ -33,22 +31,31 @@ class BigQueryWriterPipeline {
         val options = PipelineOptionsFactory
             .`as`(BigQueryWriterPipelineOptions::class.java)
         val pipeline = Pipeline.create(options)
+
+        // Change to suit your environment
+        val projectId = "your-project-id"
+        val bucketName = "your-bucket-name"
+        val region = "your-region"
+        val subnetworkName = "your-subnetwork-name"
+        val network = "your-network"
+        val subscriptionName = "your-subscription-name"
+
         options.isStreaming = true
         options.isEnableStreamingEngine = true
         options.runner = DataflowRunner::class.java
-        options.project = "project-id"
-        options.region = "us-west1"
+        options.project = projectId
+        options.region = region
         options.maxNumWorkers = 5
         options.numWorkers = 1
         options.workerMachineType = "n1-standard-2"
         options.autoscalingAlgorithm = DataflowPipelineWorkerPoolOptions.AutoscalingAlgorithmType.THROUGHPUT_BASED
         options.experiments = listOf("enable_streaming_engine", "enable_windmill_service")
         options.jobName = "bigquery-writer-pipeline-example"
-//        options.tempLocation = "gs://gcs-bigquery-example-pipeline-long-qa/tmp"
-        options.stagingLocation = "gs://gcs-bigquery-example-pipeline-long-qa/staging"
-        options.subscriptionName = "projects/${options.project}/subscriptions/bigquery-example-sub"
-//        options.gcpCredential = ServiceAccountCredentials.fromStream(FileInputStream("/sa.json"))
-//        options.serviceAccount = "sa-name@project-id.iam.gserviceaccount.com"
+        options.network = network
+        options.subnetwork = "regions/$region/subnetworks/$subnetworkName"
+        options.stagingLocation = "gs://$bucketName/staging"
+        options.tempLocation = "gs://$bucketName/tmp"
+        options.subscriptionName = "projects/${projectId}/subscriptions/$subscriptionName"
 
         val allDatasetTag = object : TupleTag<KV<String, TableRow>>() {}
         val individualDatasetTag = object : TupleTag<KV<String, TableRow>>() {}
@@ -60,10 +67,10 @@ class BigQueryWriterPipeline {
                 PubsubIO.readMessagesWithAttributes().fromSubscription(options.subscriptionName)
             )
             .apply(
+                "CreateTableRows",
                 ParDo.of(object : DoFn<PubsubMessage, KV<String, TableRow>>() {
                     @ProcessElement
                     fun processElement(ctx: ProcessContext) {
-                        val tags = listOf(allDatasetTag, individualDatasetTag)
                         val dataAll: MutableMap<String, Any> = mutableMapOf(
                             "id" to 1,
                             "name" to "Long",
@@ -80,15 +87,21 @@ class BigQueryWriterPipeline {
                         val tableRowIndividual = TableRow()
                         tableRowIndividual.unknownKeys = dataIndividual
 
+                        // Random key to randomly write data to 1 of the Individual dataset
                         val randomKey = Random.nextInt(1, 11).toString()
 
+                        // ALL dataset
                         ctx.output(allDatasetTag, KV.of(randomKey, tableRowAll))
+
+                        // Individual dataset
                         ctx.output(individualDatasetTag, KV.of(randomKey, tableRowIndividual))
                     }
                 }).withOutputTags(allDatasetTag, TupleTagList.of(individualDatasetTag))
             )
+
         tableRowResult.get(allDatasetTag)
             .apply(
+                "ALL",
                 BigQueryIO.write<KV<String, TableRow>>()
                     .to(object : DynamicDestinations<KV<String, TableRow>, String>() {
                         override fun getDestination(element: ValueInSingleWindow<KV<String, TableRow>>?): String {
@@ -97,7 +110,7 @@ class BigQueryWriterPipeline {
 
                         override fun getTable(destination: String?): TableDestination {
                             val tableReference = TableReference()
-                                .setProjectId(options.project)
+                                .setProjectId(projectId)
                                 .setDatasetId("ALL_TEST")
                                 .setTableId("gps_test")
                             return TableDestination(tableReference, null)
@@ -123,8 +136,10 @@ class BigQueryWriterPipeline {
                     .withAutoSharding()
                     .ignoreUnknownValues()
             )
+
         tableRowResult.get(individualDatasetTag)
             .apply(
+                "Individual",
                 BigQueryIO.write<KV<String, TableRow>>()
                     .to(object : DynamicDestinations<KV<String, TableRow>, String>() {
                         override fun getDestination(element: ValueInSingleWindow<KV<String, TableRow>>?): String {
@@ -133,7 +148,7 @@ class BigQueryWriterPipeline {
 
                         override fun getTable(destination: String?): TableDestination {
                             val tableReference = TableReference()
-                                .setProjectId(options.project)
+                                .setProjectId(projectId)
                                 .setDatasetId("INDIVIDUAL_TEST_$destination")
                                 .setTableId("gps_test")
                             return TableDestination(tableReference, null)
@@ -161,8 +176,8 @@ class BigQueryWriterPipeline {
         pipeline.run()
     }
 
-    interface BigQueryWriterPipelineOptions : PipelineOptions, DataflowPipelineOptions, DataflowPipelineWorkerPoolOptions {
-        @get:Description("Pubsub subscriptions separated by comma")
+    interface BigQueryWriterPipelineOptions : PipelineOptions, DataflowPipelineOptions, DataflowPipelineWorkerPoolOptions, GcpOptions {
+        @get:Description("Pubsub subscription names")
         @get:Validation.Required
         var subscriptionName: String
     }
