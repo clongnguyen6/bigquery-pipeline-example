@@ -13,7 +13,7 @@ This repository contains an example pipeline that demonstrates the INVALID_ARGUM
         - Storage Object Admin
 
 2. **Environment Variables**
-    - Export the service account key to an environment variable, [export here](https://github.com/clongnguyen6/bigquery-pipeline-example/blob/main/build.gradle.kts#L38-L43):
+    - Export the service account key to an environment variable, [export here](https://github.com/clongnguyen6/bigquery-pipeline-example/blob/main/build.gradle.kts#L40-L43):
       ```sh
       tasks {
          "run"(JavaExec::class) {
@@ -28,7 +28,7 @@ This repository contains an example pipeline that demonstrates the INVALID_ARGUM
 4. **Network and Subnetwork**
     - Create a network and subnetwork.
 
-5. **BigQuery Datasets and Tables** ([you can refer to this script](https://github.com/clongnguyen6/bigquery-pipeline-example/blob/main/src/main/kotlin/Utilites.kt))
+5. **BigQuery Datasets and Tables** ([you can refer to this script](https://github.com/clongnguyen6/bigquery-pipeline-example/blob/main/src/main/kotlin/Utilites.kt#L40))
     - Create a dataset named `ALL_TEST`. In this dataset, create a table named `gps_test` with the following schema:
         - `id: INTEGER`
         - `name: STRING`
@@ -59,4 +59,4 @@ This repository contains an example pipeline that demonstrates the INVALID_ARGUM
   ```
 
 - Check the Job in the Dataflow Job service.
-- Publish messages to the topic for the job to process and see the results. (According to the results running in our environment, the error will appear after 15 minutes, with ~10k messages, throughput ~5 elements/s)
+- Publish messages to the topic for the job to process and see the results. (According to the results running in our environment, the error will appear after 15 minutes, with ~7k messages, throughput ~7 elements/s)
