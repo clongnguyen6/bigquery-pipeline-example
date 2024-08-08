@@ -1,4 +1,4 @@
 fun main() {
-    val bqw = BigQueryWriterPipelineRefactor()
+    val bqw = BigQueryWriterPipelineRefactorPeriodicImpulse()
     bqw.run()
 }
