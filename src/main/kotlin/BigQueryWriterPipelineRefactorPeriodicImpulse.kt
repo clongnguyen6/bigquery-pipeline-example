@@ -54,12 +54,13 @@ class BigQueryWriterPipelineRefactorPeriodicImpulse {
         options.stagingLocation = "gs://$bucketName/staging"
         options.tempLocation = "gs://$bucketName/tmp"
         options.subscriptionName = "projects/${projectId}/subscriptions/$subscriptionName"
+        options.storageWriteApiMaxRetries = 10
 
         // Get and decode message from subscription
         val instants = pipeline
             .apply(
                 "Output every second",
-                PeriodicImpulse.create().stopAfter(Duration.standardMinutes(60)).withInterval(Duration.standardSeconds(1))
+                PeriodicImpulse.create().stopAfter(Duration.standardDays(1)).withInterval(Duration.millis(500))
             )
 
         val allTableRows = instants
@@ -112,10 +113,10 @@ class BigQueryWriterPipelineRefactorPeriodicImpulse {
                 BigQueryIO.write<KV<String, TableRow>>()
                     .to(object : DynamicDestinations<KV<String, TableRow>, String>() {
                         override fun getDestination(element: ValueInSingleWindow<KV<String, TableRow>>?): String {
-                            return element!!.value.key
+                            return "a" + element!!.value.key
                         }
 
-                        override fun getTable(destination: String?): TableDestination {
+                        override fun getTable(destination: String): TableDestination {
                             val tableReference = TableReference()
                                 .setProjectId(projectId)
                                 .setDatasetId("ALL_TEST")
@@ -150,13 +151,13 @@ class BigQueryWriterPipelineRefactorPeriodicImpulse {
                 BigQueryIO.write<KV<String, TableRow>>()
                     .to(object : DynamicDestinations<KV<String, TableRow>, String>() {
                         override fun getDestination(element: ValueInSingleWindow<KV<String, TableRow>>?): String {
-                            return element!!.value.key
+                            return "i" + element!!.value.key
                         }
 
-                        override fun getTable(destination: String?): TableDestination {
+                        override fun getTable(destination: String): TableDestination {
                             val tableReference = TableReference()
                                 .setProjectId(projectId)
-                                .setDatasetId("INDIVIDUAL_TEST_$destination")
+                                .setDatasetId("INDIVIDUAL_TEST_${destination.substring(1)}")
                                 .setTableId("gps_test")
                             return TableDestination(tableReference, null)
                         }
